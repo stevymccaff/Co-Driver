@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Co-Driver</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0a0a0a;
+    --panel:     #111111;
+    --border:    #222222;
+    --amber:     #ffb300;
+    --amber-dim: #7a5500;
+    --red:       #ff3b30;
+    --green:     #30d158;
+    --muted:     #444444;
+    --label:     #888888;
+    --mono:      'Share Tech Mono', monospace;
+    --condensed: 'Barlow Condensed', sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--amber);
+    font-family: var(--mono);
+    overflow: hidden;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #clock {
+    font-family: var(--mono);
+    font-size: clamp(28px, 8vw, 44px);
+    letter-spacing: 0.04em;
+    color: var(--amber);
+  }
+
+  #gps-status {
+    font-family: var(--condensed);
+    font-size: 13px;
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  #gps-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.4s;
+  }
+  #gps-dot.active { background: var(--green); }
+  #gps-dot.error  { background: var(--red); }
+
+  /* ── MAIN PANELS ── */
+  #panels {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  .panel {
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 16px;
+    flex: 1;
+    position: relative;
+  }
+
+  .panel-label {
+    font-family: var(--condensed);
+    font-size: 12px;
+    font-weight: 300;
+    letter-spacing: 0.18em;
+    color: var(--label);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  .panel-value {
+    font-family: var(--mono);
+    font-size: clamp(52px, 16vw, 88px);
+    line-height: 1;
+    letter-spacing: 0.02em;
+    color: var(--amber);
+    transition: color 0.2s;
+  }
+
+  .panel-value.running { color: #fff; }
+  .panel-value.stopped { color: var(--amber); }
+
+  .panel-sub {
+    font-family: var(--condensed);
+    font-size: 13px;
+    font-weight: 300;
+    color: var(--label);
+    margin-top: 4px;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── STOPWATCH BUTTONS ── */
+  #sw-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .btn {
+    font-family: var(--condensed);
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--amber);
+    padding: 8px 22px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    min-width: 90px;
+    text-align: center;
+  }
+
+  .btn:active { opacity: 0.7; }
+
+  .btn.start  { border-color: var(--green); color: var(--green); }
+  .btn.start:active { background: var(--green); color: #000; }
+
+  .btn.stop   { border-color: var(--red); color: var(--red); }
+  .btn.stop:active { background: var(--red); color: #000; }
+
+  .btn.reset  { border-color: var(--muted); color: var(--muted); }
+  .btn.reset:active { background: var(--muted); color: #000; }
+
+  /* ── TRIP METER CONTROLS ── */
+  #trip-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  /* ── SPLIT DISPLAY ── */
+  #splits {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    align-items: flex-end;
+  }
+
+  .split-item {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--amber-dim);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── BOTTOM BAR ── */
+  #bottombar {
+    border-top: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  #speed-display {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+  }
+
+  #speed-val {
+    font-family: var(--mono);
+    font-size: clamp(20px, 5vw, 28px);
+    color: var(--amber);
+  }
+
+  #speed-unit {
+    font-family: var(--condensed);
+    font-size: 12px;
+    color: var(--label);
+    font-weight: 300;
+  }
+
+  #accuracy-display {
+    font-family: var(--condensed);
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 300;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── CALIBRATION MODAL ── */
+  #cal-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  #cal-modal.open { display: flex; }
+
+  #cal-box {
+    background: #161616;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 24px 28px;
+    width: min(320px, 90vw);
+  }
+
+  #cal-box h2 {
+    font-family: var(--condensed);
+    font-weight: 600;
+    font-size: 18px;
+    letter-spacing: 0.1em;
+    color: var(--amber);
+    margin-bottom: 16px;
+  }
+
+  #cal-box p {
+    font-family: var(--condensed);
+    font-size: 13px;
+    color: var(--label);
+    font-weight: 300;
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+
+  #cal-input {
+    width: 100%;
+    background: #0a0a0a;
+    border: 1px solid var(--border);
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 20px;
+    padding: 10px 12px;
+    border-radius: 3px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+  #cal-input:focus { outline: none; border-color: var(--amber-dim); }
+
+  #cal-btns { display: flex; gap: 10px; }
+  #cal-btns .btn { flex: 1; }
+
+  /* ── WAKELOCK indicator ── */
+  #wakelock-status {
+    font-family: var(--condensed);
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 300;
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP: Clock + GPS -->
+<div id="topbar">
+  <div id="clock">00:00:00</div>
+  <div id="gps-status">
+    <div id="gps-dot"></div>
+    <span id="gps-label">no gps</span>
+  </div>
+</div>
+
+<!-- PANELS -->
+<div id="panels">
+
+  <!-- Stopwatch -->
+  <div class="panel" id="sw-panel">
+    <div class="panel-label">Stopwatch</div>
+    <div class="panel-value stopped" id="sw-display">00:00.0</div>
+    <div id="sw-controls">
+      <button class="btn start" id="sw-start-btn" onclick="swStartStop()">Start</button>
+      <button class="btn reset" onclick="swReset()">Reset</button>
+      <button class="btn reset" onclick="swSplit()">Split</button>
+    </div>
+    <div id="splits"></div>
+  </div>
+
+  <!-- Trip Meter -->
+  <div class="panel" id="trip-panel">
+    <div class="panel-label">Trip — km</div>
+    <div class="panel-value stopped" id="trip-display">0.000</div>
+    <div class="panel-sub" id="total-display">Total: 0.000 km</div>
+    <div id="trip-controls">
+      <button class="btn start" id="trip-start-btn" onclick="tripStartStop()">Start</button>
+      <button class="btn reset" onclick="tripReset()">Reset Trip</button>
+      <button class="btn reset" onclick="openCal()">Set</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM: Speed + accuracy -->
+<div id="bottombar">
+  <div id="speed-display">
+    <span id="speed-val">–</span>
+    <span id="speed-unit">km/h</span>
+  </div>
+  <div id="accuracy-display" style="display:none">±<span id="accuracy-val">–</span>m</div>
+  <div id="wakelock-status"></div>
+</div>
+
+<!-- Calibration modal -->
+<div id="cal-modal">
+  <div id="cal-box">
+    <h2>Set Trip Distance</h2>
+    <p>Override the trip meter to a specific distance in km — useful for matching roadbook or known position.</p>
+    <input id="cal-input" type="number" step="0.001" min="0" placeholder="0.000" inputmode="decimal">
+    <div id="cal-btns">
+      <button class="btn reset" onclick="closeCal()">Cancel</button>
+      <button class="btn start" onclick="applyCal()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CLOCK ──────────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+}
+setInterval(updateClock, 250);
+updateClock();
+
+// ── STOPWATCH ──────────────────────────────────────────────────────────
+let swRunning = false;
+let swStartTime = 0;
+let swElapsed = 0;
+let swInterval = null;
+let splits = [];
+
+function swFormat(ms) {
+  const totalTenths = Math.floor(ms / 100);
+  const tenths = totalTenths % 10;
+  const totalSecs = Math.floor(ms / 1000);
+  const secs = totalSecs % 60;
+  const mins = Math.floor(totalSecs / 60);
+  return `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}.${tenths}`;
+}
+
+function swTick() {
+  const now = performance.now();
+  const total = swElapsed + (now - swStartTime);
+  document.getElementById('sw-display').textContent = swFormat(total);
+}
+
+function swStartStop() {
+  const btn = document.getElementById('sw-start-btn');
+  const disp = document.getElementById('sw-display');
+  if (!swRunning) {
+    swStartTime = performance.now();
+    swInterval = setInterval(swTick, 100);
+    swRunning = true;
+    btn.textContent = 'Stop';
+    btn.className = 'btn stop';
+    disp.className = 'panel-value running';
+  } else {
+    swElapsed += performance.now() - swStartTime;
+    clearInterval(swInterval);
+    swRunning = false;
+    btn.textContent = 'Start';
+    btn.className = 'btn start';
+    disp.className = 'panel-value stopped';
+  }
+}
+
+function swReset() {
+  clearInterval(swInterval);
+  swRunning = false;
+  swElapsed = 0;
+  splits = [];
+  document.getElementById('sw-display').textContent = '00:00.0';
+  document.getElementById('sw-display').className = 'panel-value stopped';
+  document.getElementById('sw-start-btn').textContent = 'Start';
+  document.getElementById('sw-start-btn').className = 'btn start';
+  document.getElementById('splits').innerHTML = '';
+}
+
+function swSplit() {
+  if (!swRunning && swElapsed === 0) return;
+  const now = swRunning
+    ? swElapsed + (performance.now() - swStartTime)
+    : swElapsed;
+  splits.unshift(swFormat(now));
+  if (splits.length > 4) splits.pop();
+  const el = document.getElementById('splits');
+  el.innerHTML = splits.map(s => `<div class="split-item">${s}</div>`).join('');
+}
+
+// ── GPS TRIP METER ─────────────────────────────────────────────────────
+let tripRunning = false;
+let tripKm = 0;
+let totalKm = 0;
+let lastPos = null;
+let watchId = null;
+let gpsActive = false;
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2
+    + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function updateTripDisplay() {
+  document.getElementById('trip-display').textContent = tripKm.toFixed(3);
+  document.getElementById('total-display').textContent = `Total: ${totalKm.toFixed(3)} km`;
+}
+
+function onPosition(pos) {
+  const { latitude, longitude, accuracy, speed } = pos.coords;
+
+  // GPS status
+  if (!gpsActive) {
+    gpsActive = true;
+    document.getElementById('gps-dot').className = 'active';
+    document.getElementById('gps-label').textContent = 'gps ok';
+  }
+
+  // Accuracy
+  const accEl = document.getElementById('accuracy-display');
+  accEl.style.display = 'block';
+  document.getElementById('accuracy-val').textContent = Math.round(accuracy);
+
+  // Speed
+  if (speed !== null && speed >= 0) {
+    document.getElementById('speed-val').textContent = Math.round(speed * 3.6);
+  }
+
+  // Trip distance — only accumulate if accuracy is reasonable and trip is running
+  if (tripRunning && lastPos && accuracy < 30) {
+    const dist = haversineKm(lastPos.lat, lastPos.lon, latitude, longitude);
+    // Sanity: ignore jumps > 0.5km between readings (bad GPS fix)
+    if (dist < 0.5) {
+      tripKm += dist;
+      totalKm += dist;
+      updateTripDisplay();
+    }
+  }
+
+  if (tripRunning || !lastPos) {
+    lastPos = { lat: latitude, lon: longitude };
+  }
+}
+
+function onGpsError(err) {
+  document.getElementById('gps-dot').className = 'error';
+  document.getElementById('gps-label').textContent = 'gps error';
+  gpsActive = false;
+}
+
+function startGPS() {
+  if (!('geolocation' in navigator)) {
+    document.getElementById('gps-label').textContent = 'no gps api';
+    document.getElementById('gps-dot').className = 'error';
+    return;
+  }
+  document.getElementById('gps-label').textContent = 'acquiring…';
+  watchId = navigator.geolocation.watchPosition(onPosition, onGpsError, {
+    enableHighAccuracy: true,
+    maximumAge: 1000,
+    timeout: 10000
+  });
+}
+
+function tripStartStop() {
+  const btn = document.getElementById('trip-start-btn');
+  const disp = document.getElementById('trip-display');
+  if (!tripRunning) {
+    tripRunning = true;
+    lastPos = null; // reset so first reading doesn't jump
+    if (watchId === null) startGPS();
+    btn.textContent = 'Stop';
+    btn.className = 'btn stop';
+    disp.className = 'panel-value running';
+  } else {
+    tripRunning = false;
+    btn.textContent = 'Start';
+    btn.className = 'btn start';
+    disp.className = 'panel-value stopped';
+  }
+}
+
+function tripReset() {
+  tripKm = 0;
+  lastPos = null;
+  updateTripDisplay();
+}
+
+// Calibration
+function openCal() {
+  document.getElementById('cal-input').value = tripKm.toFixed(3);
+  document.getElementById('cal-modal').classList.add('open');
+  setTimeout(() => document.getElementById('cal-input').focus(), 100);
+}
+function closeCal() {
+  document.getElementById('cal-modal').classList.remove('open');
+}
+function applyCal() {
+  const val = parseFloat(document.getElementById('cal-input').value);
+  if (!isNaN(val) && val >= 0) {
+    tripKm = val;
+    updateTripDisplay();
+  }
+  closeCal();
+}
+
+// Close modal on backdrop tap
+document.getElementById('cal-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeCal();
+});
+
+// ── WAKE LOCK ──────────────────────────────────────────────────────────
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      await navigator.wakeLock.request('screen');
+      document.getElementById('wakelock-status').textContent = 'screen on';
+    } catch(e) {
+      document.getElementById('wakelock-status').textContent = '';
+    }
+  }
+}
+requestWakeLock();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') requestWakeLock();
+});
+
+// ── INIT ───────────────────────────────────────────────────────────────
+startGPS();
+updateTripDisplay();
+</script>
+</body>
+</html>
