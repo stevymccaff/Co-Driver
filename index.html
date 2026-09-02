@@ -293,6 +293,141 @@
     color: var(--muted);
     font-weight: 300;
   }
+
+  /* ── TC CALCULATOR MODAL ── */
+  #tc-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  #tc-modal.open { display: flex; }
+
+  #tc-box {
+    background: #161616;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 18px 16px 16px;
+    width: 100%;
+    max-width: 360px;
+  }
+
+  #tc-box h2 {
+    font-family: var(--condensed);
+    font-weight: 600;
+    font-size: 17px;
+    letter-spacing: 0.1em;
+    color: var(--amber);
+    margin-bottom: 14px;
+  }
+
+  /* Each row: label on left, HH:MM on right */
+  .tc-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .tc-row-label {
+    font-family: var(--condensed);
+    font-size: 13px;
+    font-weight: 300;
+    letter-spacing: 0.12em;
+    color: var(--label);
+    text-transform: uppercase;
+    flex: 1;
+  }
+
+  .tc-hhmm {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .tc-input {
+    width: 52px;
+    background: #0d0d0d;
+    border: 1px solid var(--border);
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 24px;
+    padding: 7px 2px;
+    border-radius: 3px;
+    text-align: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tc-input:focus { outline: none; border-color: var(--amber-dim); }
+
+  .tc-colon {
+    font-family: var(--mono);
+    font-size: 20px;
+    color: var(--muted);
+    padding: 0 4px;
+    user-select: none;
+  }
+
+  /* Due row — amber highlighted boxes */
+  .tc-due-val {
+    width: 52px;
+    background: #1a1400;
+    border: 1px solid var(--amber-dim);
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 24px;
+    padding: 7px 2px;
+    border-radius: 3px;
+    text-align: center;
+  }
+  .tc-due-val.overdue {
+    background: #1a0000;
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  .tc-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 12px 0;
+  }
+
+  .tc-countdown {
+    text-align: center;
+    font-family: var(--condensed);
+    font-size: 14px;
+    font-weight: 300;
+    color: var(--label);
+    margin-bottom: 14px;
+    min-height: 20px;
+    letter-spacing: 0.05em;
+  }
+  .tc-countdown.urgent { color: var(--red); }
+  .tc-countdown.ok     { color: var(--green); }
+
+  #tc-btns { display: flex; gap: 10px; }
+  #tc-btns .btn { flex: 1; min-width: 0; }
+
+  /* TC button in bottom bar */
+  #tc-open-btn {
+    font-family: var(--condensed);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border: 1px solid var(--amber-dim);
+    background: transparent;
+    color: var(--amber-dim);
+    padding: 5px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    white-space: nowrap;
+  }
+  #tc-open-btn:active { background: var(--amber-dim); color: #000; }
 </style>
 </head>
 <body>
@@ -340,9 +475,15 @@
   <div id="speed-display">
     <span id="speed-val">–</span>
     <span id="speed-unit">km/h</span>
+    <span id="heading-sep" style="color:var(--muted);font-family:var(--mono);font-size:16px;margin:0 6px;display:none">·</span>
+    <span id="heading-val" style="font-family:var(--mono);font-size:clamp(20px,5vw,28px);color:var(--amber);display:none"></span>
+    <span id="heading-unit" style="font-family:var(--condensed);font-size:12px;color:var(--label);font-weight:300;margin-left:2px;display:none"></span>
   </div>
   <div id="accuracy-display" style="display:none">±<span id="accuracy-val">–</span>m</div>
-  <div id="wakelock-status"></div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <button id="tc-open-btn" onclick="openTC()">TC Calc</button>
+    <div id="wakelock-status"></div>
+  </div>
 </div>
 
 <!-- Calibration modal -->
@@ -354,6 +495,52 @@
     <div id="cal-btns">
       <button class="btn reset" onclick="closeCal()">Cancel</button>
       <button class="btn start" onclick="applyCal()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- TC Calculator modal -->
+<div id="tc-modal">
+  <div id="tc-box">
+    <h2>TC Calculator</h2>
+
+    <!-- TC opens -->
+    <div class="tc-row">
+      <div class="tc-row-label">TC opens</div>
+      <div class="tc-hhmm">
+        <input class="tc-input" id="tc-h" type="number" min="0" max="23" placeholder="HH" inputmode="numeric" oninput="calcTC()">
+        <span class="tc-colon">:</span>
+        <input class="tc-input" id="tc-m" type="number" min="0" max="59" placeholder="MM" inputmode="numeric" oninput="calcTC()">
+      </div>
+    </div>
+
+    <!-- Transit -->
+    <div class="tc-row">
+      <div class="tc-row-label">Transit</div>
+      <div class="tc-hhmm">
+        <input class="tc-input" id="tr-h" type="number" min="0" max="9" placeholder="HH" inputmode="numeric" oninput="calcTC()">
+        <span class="tc-colon">:</span>
+        <input class="tc-input" id="tr-m" type="number" min="0" max="59" placeholder="MM" inputmode="numeric" oninput="calcTC()">
+      </div>
+    </div>
+
+    <hr class="tc-divider">
+
+    <!-- Due (calculated) -->
+    <div class="tc-row">
+      <div class="tc-row-label">Due at</div>
+      <div class="tc-hhmm">
+        <div class="tc-due-val" id="due-h">––</div>
+        <span class="tc-colon" style="color:var(--amber-dim)">:</span>
+        <div class="tc-due-val" id="due-m">––</div>
+      </div>
+    </div>
+
+    <div class="tc-countdown" id="tc-countdown"></div>
+
+    <div id="tc-btns">
+      <button class="btn reset" onclick="resetTC()">Reset</button>
+      <button class="btn reset" onclick="closeTC()">Close</button>
     </div>
   </div>
 </div>
@@ -458,7 +645,7 @@ function updateTripDisplay() {
 }
 
 function onPosition(pos) {
-  const { latitude, longitude, accuracy, speed } = pos.coords;
+  const { latitude, longitude, accuracy, speed, heading } = pos.coords;
 
   // GPS status
   if (!gpsActive) {
@@ -475,6 +662,17 @@ function onPosition(pos) {
   // Speed
   if (speed !== null && speed >= 0) {
     document.getElementById('speed-val').textContent = Math.round(speed * 3.6);
+  }
+
+  // Heading
+  if (heading !== null && !isNaN(heading)) {
+    const dirs = ['N','NE','E','SE','S','SW','W','NW','N'];
+    const cardinal = dirs[Math.round(heading / 45)];
+    document.getElementById('heading-val').textContent = Math.round(heading) + '°';
+    document.getElementById('heading-unit').textContent = cardinal;
+    document.getElementById('heading-sep').style.display = 'inline';
+    document.getElementById('heading-val').style.display = 'inline';
+    document.getElementById('heading-unit').style.display = 'inline';
   }
 
   // Trip distance — only accumulate if accuracy is reasonable and trip is running
@@ -574,6 +772,118 @@ async function requestWakeLock() {
 requestWakeLock();
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') requestWakeLock();
+});
+
+// ── TC CALCULATOR ──────────────────────────────────────────────────────
+let tcCountdownInterval = null;
+
+function openTC() {
+  const tcHEl = document.getElementById('tc-h');
+  const tcMEl = document.getElementById('tc-m');
+  // Only pre-fill time if fields are empty (first open)
+  if (tcHEl.value === '' && tcMEl.value === '') {
+    const now = new Date();
+    tcHEl.value = String(now.getHours()).padStart(2,'0');
+    tcMEl.value = String(now.getMinutes()).padStart(2,'0');
+  }
+  document.getElementById('tc-modal').classList.add('open');
+  // Resume countdown if a due time is already calculated
+  const dueH = parseInt(document.getElementById('due-h').textContent);
+  const dueM = parseInt(document.getElementById('due-m').textContent);
+  clearInterval(tcCountdownInterval);
+  if (!isNaN(dueH) && !isNaN(dueM)) {
+    updateTCCountdown(dueH, dueM);
+    tcCountdownInterval = setInterval(() => updateTCCountdown(dueH, dueM), 10000);
+  }
+}
+
+function closeTC() {
+  document.getElementById('tc-modal').classList.remove('open');
+  clearInterval(tcCountdownInterval);
+}
+
+function resetTC() {
+  document.getElementById('tc-h').value = '';
+  document.getElementById('tc-m').value = '';
+  document.getElementById('tr-h').value = '';
+  document.getElementById('tr-m').value = '';
+  document.getElementById('due-h').textContent = '––';
+  document.getElementById('due-m').textContent = '––';
+  document.getElementById('due-h').className = 'tc-due-val';
+  document.getElementById('due-m').className = 'tc-due-val';
+  document.getElementById('tc-countdown').textContent = '';
+  document.getElementById('tc-countdown').className = 'tc-countdown';
+  clearInterval(tcCountdownInterval);
+}
+
+function calcTC() {
+  const tcH = parseInt(document.getElementById('tc-h').value);
+  const tcM = parseInt(document.getElementById('tc-m').value);
+  const trH = parseInt(document.getElementById('tr-h').value) || 0;
+  const trM = parseInt(document.getElementById('tr-m').value) || 0;
+
+  if (isNaN(tcH) || isNaN(tcM)) {
+    document.getElementById('due-h').textContent = '––';
+    document.getElementById('due-m').textContent = '––';
+    document.getElementById('tc-countdown').textContent = '';
+    clearInterval(tcCountdownInterval);
+    return;
+  }
+
+  const tcTotalMins = tcH * 60 + tcM;
+  const transitMins = trH * 60 + trM;
+  const dueTotalMins = (tcTotalMins + transitMins) % (24 * 60);
+
+  const dueH = Math.floor(dueTotalMins / 60);
+  const dueM = dueTotalMins % 60;
+
+  document.getElementById('due-h').textContent = String(dueH).padStart(2,'0');
+  document.getElementById('due-m').textContent = String(dueM).padStart(2,'0');
+
+  // Start live countdown
+  clearInterval(tcCountdownInterval);
+  updateTCCountdown(dueH, dueM);
+  tcCountdownInterval = setInterval(() => updateTCCountdown(dueH, dueM), 10000);
+}
+
+function updateTCCountdown(dueH, dueM) {
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const dueMins = dueH * 60 + dueM;
+  let diff = dueMins - nowMins;
+
+  // Handle crossing midnight
+  if (diff < -720) diff += 1440;
+  if (diff > 720)  diff -= 1440;
+
+  const el = document.getElementById('tc-countdown');
+  const dueEl_h = document.getElementById('due-h');
+  const dueEl_m = document.getElementById('due-m');
+
+  if (diff < 0) {
+    const absDiff = Math.abs(diff);
+    const oh = Math.floor(absDiff / 60);
+    const om = absDiff % 60;
+    el.textContent = `Overdue by ${oh > 0 ? oh + 'h ' : ''}${om}m`;
+    el.className = 'tc-countdown urgent';
+    dueEl_h.className = 'tc-due-val overdue';
+    dueEl_m.className = 'tc-due-val overdue';
+  } else if (diff === 0) {
+    el.textContent = 'Due now';
+    el.className = 'tc-countdown urgent';
+  } else {
+    const rh = Math.floor(diff / 60);
+    const rm = diff % 60;
+    el.textContent = `${rh > 0 ? rh + 'h ' : ''}${rm}m remaining`;
+    el.className = diff <= 5 ? 'tc-countdown urgent' : diff <= 15 ? 'tc-countdown' : 'tc-countdown ok';
+    dueEl_h.className = 'tc-due-val';
+    dueEl_m.className = 'tc-due-val';
+  }
+}
+
+// Close TC modal on backdrop tap
+document.getElementById('tc-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeTC();
 });
 
 // ── INIT ───────────────────────────────────────────────────────────────
